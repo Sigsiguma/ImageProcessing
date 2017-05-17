@@ -6,7 +6,26 @@
 using namespace std;
 using namespace cv;
 
-vector<float> CreateGaussianKernel(double sigma) {
+template<typename T>
+T clamp(const T &value, const T &low, const T &high) {
+    return value < low ? low : (value > high ? high : value);
+}
+
+uchar filter(const Mat &src, const vector<float> &kernel, int srcX, int srcY, int row, int col, int radius) {
+
+    int result = 0;
+
+    for (int y = 0; y < row; ++y) {
+        const uchar *imgSrc = src.ptr<uchar>(srcY + y - radius);
+        for (int x = 0; x < col; ++x) {
+            result += imgSrc[srcX + x - radius] * kernel.at(y * col + x);
+        }
+    }
+
+    return static_cast<uchar>(clamp(result, 0, 255));
+}
+
+vector<float> createGaussianKernel(double sigma) {
 
     vector<float> data;
 
@@ -23,33 +42,82 @@ vector<float> CreateGaussianKernel(double sigma) {
     return data;
 }
 
+double pixelValueWeight(const Mat &src, int x, int y) {
+
+    CV_Assert(src.type() == CV_8UC1);
+}
+
+vector<float> createBilateralKernel(const Mat &src, double sigma) {
+
+    CV_Assert(src.type() == CV_8UC1);
+
+    vector<float> data;
+
+    int radius = sigma * 3;
+    double sigma2 = sigma * sigma;
+
+    for (int y = -radius; y <= radius; ++y) {
+        for (int x = -radius; x <= radius; ++x) {
+
+        }
+    }
+
+}
+
 void gaussianFilter(const Mat &src, Mat &dest, double sigma) {
 
     CV_Assert(src.size() == dest.size());
+    CV_Assert(src.type() == CV_8UC1);
+    CV_Assert(dest.type() == CV_8UC1);
 
-    vector<float> data = CreateGaussianKernel(sigma);
+    vector<float> data = createGaussianKernel(sigma);
 
-    int w = 3 * sigma;
+    int radius = 3 * sigma;
 
-    Mat kernel(Size(2 * w + 1, 2 * w + 1), CV_32F, data.data());
+    for (int y = 0; y < src.rows; ++y) {
+        const uchar *imgSrc = src.ptr<uchar>(y);
+        uchar *imgDest = dest.ptr<uchar>(y);
+        for (int x = 0; x < src.cols; ++x) {
+            if (y < radius || x < radius || y > (src.rows - 1) - radius || x > (src.cols - 1) - radius) {
+                imgDest[x] = imgSrc[x];
+                continue;
+            }
 
-    filter2D(src, dest, -1, kernel);
+            imgDest[x] = filter(src, data, x, y, 2 * radius + 1, 2 * radius + 1, radius);
+        }
+    }
 }
 
 void laplacianFilter(const Mat &src, Mat &dest) {
 
     CV_Assert(src.size() == dest.size());
+    CV_Assert(src.type() == CV_8UC1);
+    CV_Assert(dest.type() == CV_8UC1);
 
-    float data[3][3] = {{0, 1,  0},
-                        {1, -4, 1},
-                        {0, 1,  0}};
+    vector<float> data = {0, 1, 0, 1, -4, 1, 0, 1, 0};
 
-    Mat kernel(Size(3, 3), CV_32F, data);
+    int radius = 1;
 
-    filter2D(src, dest, -1, kernel);
+    for (int y = 0; y < src.rows; ++y) {
+        const uchar *imgSrc = src.ptr<uchar>(y);
+        uchar *imgDest = dest.ptr<uchar>(y);
+        for (int x = 0; x < src.cols; ++x) {
+            if (y < radius || x < radius || y > (src.rows - 1) - radius || x > (src.cols - 1) - radius) {
+                imgDest[x] = imgSrc[x];
+                continue;
+            }
+
+            imgDest[x] = filter(src, data, x, y, 2 * radius + 1, 2 * radius + 1, radius);
+        }
+    }
+
 }
 
 void bilateralFilter(const Mat &src, Mat &dest, double space_sigma, double color_sigma) {
+
+    CV_Assert(src.size() == dest.size());
+    CV_Assert(src.type() == CV_8UC1);
+    CV_Assert(dest.type() == CV_8UC1);
 
 }
 
@@ -70,15 +138,12 @@ int main() {
     const string windowName = "Window";
     namedWindow(windowName, WINDOW_AUTOSIZE);
 
-    Mat img = imread("./img/lenna.png");
-    Mat gray;
+    Mat img = imread("./img/lenna.png", CV_8UC1);
     Mat dest;
 
-    img.copyTo(gray);
     img.copyTo(dest);
 
-    cvtColor(img, gray, CV_BGR2GRAY);
-    laplacianFilter(gray, dest);
+    gaussianFilter(img, dest, 2.0);
 
     while (1) {
 
