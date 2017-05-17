@@ -6,11 +6,6 @@
 using namespace std;
 using namespace cv;
 
-template<typename T>
-T clamp(const T &value, const T &low, const T &high) {
-    return value < low ? low : (value > high ? high : value);
-}
-
 vector<float> CreateGaussianKernel(double sigma) {
 
     vector<float> data;
@@ -30,6 +25,8 @@ vector<float> CreateGaussianKernel(double sigma) {
 
 void gaussianFilter(const Mat &src, Mat &dest, double sigma) {
 
+    CV_Assert(src.size() == dest.size());
+
     vector<float> data = CreateGaussianKernel(sigma);
 
     int w = 3 * sigma;
@@ -40,6 +37,8 @@ void gaussianFilter(const Mat &src, Mat &dest, double sigma) {
 }
 
 void laplacianFilter(const Mat &src, Mat &dest) {
+
+    CV_Assert(src.size() == dest.size());
 
     float data[3][3] = {{0, 1,  0},
                         {1, -4, 1},
@@ -54,6 +53,17 @@ void bilateralFilter(const Mat &src, Mat &dest, double space_sigma, double color
 
 }
 
+void UnsharpMask(const Mat &src, Mat &dest, double sigma, int k) {
+
+    CV_Assert(src.size() == dest.size());
+
+    gaussianFilter(src, dest, sigma);
+
+    Mat diff = dest - src;
+
+    dest = src + k * diff;
+}
+
 
 int main() {
 
@@ -64,8 +74,11 @@ int main() {
     Mat gray;
     Mat dest;
 
+    img.copyTo(gray);
+    img.copyTo(dest);
+
     cvtColor(img, gray, CV_BGR2GRAY);
-    gaussianFilter(gray, dest, 2.0);
+    laplacianFilter(gray, dest);
 
     while (1) {
 
