@@ -13,7 +13,7 @@ T clamp(const T &value, const T &low, const T &high) {
 
 uchar filter(const Mat &src, const vector<double> &kernel, int srcX, int srcY, int row, int col, int radius) {
 
-    int result = 0;
+    double result = 0;
 
     for (int y = 0; y < row; ++y) {
         const uchar *imgSrc = src.ptr<uchar>(srcY + y - radius);
@@ -22,7 +22,7 @@ uchar filter(const Mat &src, const vector<double> &kernel, int srcX, int srcY, i
         }
     }
 
-    return static_cast<uchar>(clamp(result, 0, 255));
+    return clamp(static_cast<int>(result), 0, 255);
 }
 
 vector<double> createGaussianKernel(double sigma) {
@@ -37,10 +37,6 @@ vector<double> createGaussianKernel(double sigma) {
             data.emplace_back((1.0 / (2.0 * M_PI * sigma2)) *
                               exp(-(x * x + y * y) / (2.0 * sigma2)));
         }
-    }
-
-    for(const auto& t : data) {
-        cout << t << endl;
     }
 
     return data;
@@ -142,13 +138,13 @@ int main() {
     const string windowName = "Window";
     namedWindow(windowName, WINDOW_AUTOSIZE);
 
-    Mat img = imread("./img/test.png", CV_8UC1);
+    Mat img = imread("./img/lenna.png", CV_8UC1);
     Mat dest;
 
     img.copyTo(dest);
 
-    gaussianFilter(img, dest, 2.0 / 3.0);
-//    GaussianBlur(img, dest, Size(13,13), 2.0);
+
+    gaussianFilter(img, dest, 2.0);
 
     while (1) {
 
