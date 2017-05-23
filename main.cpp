@@ -55,6 +55,7 @@ void gaussianFilter(const Mat &src, Mat &dest, int r) {
 	CV_Assert(dest.type() == CV_8UC1);
 
 	Mat srcExpandBoarder;
+	//端のときに範囲外にならないようにフィルタ半径分全方向に広げる
 	copyMakeBorder(src, srcExpandBoarder, r + 1, r + 1, r + 1, r + 1, cv::BORDER_REFLECT_101);
 
 	double sigma = r / 3.0;
@@ -79,6 +80,7 @@ void laplacianFilter(const Mat &src, Mat &dest) {
 	int r = 1;
 
 	Mat srcExpandBoarder;
+	//端のときに範囲外にならないようにフィルタ半径分全方向に広げる
 	copyMakeBorder(src, srcExpandBoarder, r + 1, r + 1, r + 1, r + 1, cv::BORDER_REFLECT_101);
 
 	vector<double> data = {0, 1, 0, 1, -4, 1, 0, 1, 0};
@@ -120,6 +122,7 @@ void bilateralFilter(const Mat &src, Mat &dest, int r, double color_sigma) {
 	const int kernelSize = 2 * r + 1;
 
 	Mat srcExpandBoarder;
+	//端のときに範囲外にならないようにフィルタ半径分全方向に広げる
 	copyMakeBorder(src, srcExpandBoarder, r + 1, r + 1, r + 1, r + 1, cv::BORDER_REFLECT_101);
 
 	for (int y = 0; y < src.rows; ++y) {
@@ -140,11 +143,11 @@ void bilateralFilter(const Mat &src, Mat &dest, int r, double color_sigma) {
 	}
 }
 
-void UnsharpMask(const Mat &src, Mat &dest, double sigma, int k) {
+void UnsharpMask(const Mat &src, Mat &dest, int r, int k) {
 
 	CV_Assert(src.size() == dest.size());
 
-	gaussianFilter(src, dest, sigma * 3);
+	gaussianFilter(src, dest, r);
 
 	Mat diff = dest - src;
 
@@ -161,7 +164,10 @@ enum class FilterType {
 int main() {
 
 	const string windowName = "Window";
+	const string trackBarName1 = "FilterRadius";
+	const string trackBarName2 = "SharpeningCoefficient";
 	namedWindow(windowName, WINDOW_AUTOSIZE);
+
 
 	Mat img = imread("./img/lenna.png", CV_8UC1);
 	Mat dest;
@@ -170,6 +176,9 @@ int main() {
 	int type;
 	cout << "Input - Gaussian: 0, Laplacian: 1, Bilateral: 2, Unsharp: 3" << endl;
 	cin >> type;
+
+	int r = 2;
+	int k = 1;
 
 	switch (static_cast<FilterType>(type)) {
 		case FilterType::Gaussian:
@@ -182,11 +191,19 @@ int main() {
 			bilateralFilter(img, dest, 10, 0.1);
 			break;
 		case FilterType::Unsharp:
-			UnsharpMask(img, dest, 2.0, 4);
+			cv::createTrackbar(trackBarName1, windowName, &r, 10);
+			cv::createTrackbar(trackBarName2, windowName, &k, 9);
+			UnsharpMask(img, dest, r, k);
 			break;
 	}
 
 	while (1) {
+
+		if (static_cast<FilterType>(type) == FilterType::Unsharp) {
+			r = cv::getTrackbarPos(trackBarName1, windowName);
+			k = cv::getTrackbarPos(trackBarName2, windowName);
+			UnsharpMask(img, dest, r, k);
+		}
 
 		imshow(windowName, dest);
 
