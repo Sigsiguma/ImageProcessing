@@ -1,3 +1,5 @@
+#define _USE_MATH_DEFINES
+
 #include <vector>
 #include "include.hpp"
 #include "sample_code.hpp"
@@ -8,155 +10,192 @@ using namespace cv;
 
 template<typename T>
 T clamp(const T &value, const T &low, const T &high) {
-    return value < low ? low : (value > high ? high : value);
+	return value < low ? low : (value > high ? high : value);
 }
 
-uchar filter(const Mat &src, const vector<double> &kernel, int srcX, int srcY, int row, int col, int radius) {
 
-    double result = 0;
+uchar filter(const Mat &src, const vector<double> &kernel, int r) {
 
-    for (int y = 0; y < row; ++y) {
-        const uchar *imgSrc = src.ptr<uchar>(srcY + y - radius);
-        for (int x = 0; x < col; ++x) {
-            result += imgSrc[srcX + x - radius] * kernel.at(y * col + x);
-        }
-    }
+	double result = 0;
 
-    return clamp(static_cast<int>(result), 0, 255);
+	const int kernelSize = 2 * r + 1;
+
+	for (int y = 0; y < kernelSize; ++y) {
+		const uchar *imgSrc = src.ptr<uchar>(y);
+		for (int x = 0; x < kernelSize; ++x) {
+			result += imgSrc[x] * kernel.at(y * kernelSize + x);
+		}
+	}
+
+	return clamp(static_cast<int>(result), 0, 255);
 }
 
-vector<double> createGaussianKernel(double sigma) {
+vector<double> createGaussianKernel(int r) {
 
-    vector<double> data;
+	vector<double> data;
 
-    int radius = sigma * 3;
-    double sigma2 = sigma * sigma;
+	double sigma = r / 3.0;
+	double sigma2 = sigma * sigma;
 
-    for (int y = -radius; y <= radius; ++y) {
-        for (int x = -radius; x <= radius; ++x) {
-            data.emplace_back((1.0 / (2.0 * M_PI * sigma2)) *
-                              exp(-(x * x + y * y) / (2.0 * sigma2)));
-        }
-    }
+	for (int y = -r; y <= r; ++y) {
+		for (int x = -r; x <= r; ++x) {
+			data.emplace_back((1.0 / (2.0 * M_PI * sigma2)) *
+			                  exp(-(x * x + y * y) / (2.0 * sigma2)));
+		}
+	}
 
-    return data;
+	return data;
 }
 
-double pixelValueWeight(const Mat &src, int x, int y) {
 
-    CV_Assert(src.type() == CV_8UC1);
-}
+void gaussianFilter(const Mat &src, Mat &dest, int r) {
 
-vector<double> createBilateralKernel(const Mat &src, double sigma) {
+	CV_Assert(src.size() == dest.size());
+	CV_Assert(src.type() == CV_8UC1);
+	CV_Assert(dest.type() == CV_8UC1);
 
-    CV_Assert(src.type() == CV_8UC1);
+	Mat srcExpandBoarder;
+	copyMakeBorder(src, srcExpandBoarder, r + 1, r + 1, r + 1, r + 1, cv::BORDER_REFLECT_101);
 
-    vector<double> data;
+	double sigma = r / 3.0;
 
-    int radius = sigma * 3;
-    double sigma2 = sigma * sigma;
+	vector<double> data = createGaussianKernel(r);
 
-    for (int y = -radius; y <= radius; ++y) {
-        for (int x = -radius; x <= radius; ++x) {
-
-        }
-    }
-
-}
-
-void gaussianFilter(const Mat &src, Mat &dest, double sigma) {
-
-    CV_Assert(src.size() == dest.size());
-    CV_Assert(src.type() == CV_8UC1);
-    CV_Assert(dest.type() == CV_8UC1);
-
-    vector<double> data = createGaussianKernel(sigma);
-
-    int radius = 3 * sigma;
-
-    for (int y = 0; y < src.rows; ++y) {
-        const uchar *imgSrc = src.ptr<uchar>(y);
-        uchar *imgDest = dest.ptr<uchar>(y);
-        for (int x = 0; x < src.cols; ++x) {
-            if (y < radius || x < radius || y > (src.rows - 1) - radius || x > (src.cols - 1) - radius) {
-                imgDest[x] = imgSrc[x];
-                continue;
-            }
-
-            imgDest[x] = filter(src, data, x, y, 2 * radius + 1, 2 * radius + 1, radius);
-        }
-    }
+	for (int y = 0; y < src.rows; ++y) {
+		uchar *imgDest = dest.ptr<uchar>(y);
+		for (int x = 0; x < src.cols; ++x) {
+			Mat partMat = srcExpandBoarder(Rect(x, y, 2 * r + 1, 2 * r + 1));
+			imgDest[x] = filter(partMat, data, r);
+		}
+	}
 }
 
 void laplacianFilter(const Mat &src, Mat &dest) {
 
-    CV_Assert(src.size() == dest.size());
-    CV_Assert(src.type() == CV_8UC1);
-    CV_Assert(dest.type() == CV_8UC1);
+	CV_Assert(src.size() == dest.size());
+	CV_Assert(src.type() == CV_8UC1);
+	CV_Assert(dest.type() == CV_8UC1);
 
-    vector<double> data = {0, 1, 0, 1, -4, 1, 0, 1, 0};
+	int r = 1;
 
-    int radius = 1;
+	Mat srcExpandBoarder;
+	copyMakeBorder(src, srcExpandBoarder, r + 1, r + 1, r + 1, r + 1, cv::BORDER_REFLECT_101);
 
-    for (int y = 0; y < src.rows; ++y) {
-        const uchar *imgSrc = src.ptr<uchar>(y);
-        uchar *imgDest = dest.ptr<uchar>(y);
-        for (int x = 0; x < src.cols; ++x) {
-            if (y < radius || x < radius || y > (src.rows - 1) - radius || x > (src.cols - 1) - radius) {
-                imgDest[x] = imgSrc[x];
-                continue;
-            }
+	vector<double> data = {0, 1, 0, 1, -4, 1, 0, 1, 0};
 
-            imgDest[x] = filter(src, data, x, y, 2 * radius + 1, 2 * radius + 1, radius);
-        }
-    }
+
+	for (int y = 0; y < src.rows; ++y) {
+		uchar *imgDest = dest.ptr<uchar>(y);
+		for (int x = 0; x < src.cols; ++x) {
+			Mat partMat = srcExpandBoarder(Rect(x, y, 2 * r + 1, 2 * r + 1));
+			imgDest[x] = filter(partMat, data, r);
+		}
+	}
 
 }
 
-void bilateralFilter(const Mat &src, Mat &dest, double space_sigma, double color_sigma) {
+double pixelValueWeight(const Mat &src, const int m, const int n, const int x, const int y, const double space_sigma,
+                        const double color_sigma) {
 
-    CV_Assert(src.size() == dest.size());
-    CV_Assert(src.type() == CV_8UC1);
-    CV_Assert(dest.type() == CV_8UC1);
+	CV_Assert(src.type() == CV_8UC1);
 
+	const uchar fxy = src.ptr<uchar>(y)[x];
+	const uchar fxmyn = src.ptr<uchar>(y + n)[x + m];
+
+	double weight = exp(-(m * m + n * n) / (2 * space_sigma * space_sigma)) *
+	                exp((-(fxy - fxmyn) * (fxy - fxmyn)) / 2 * color_sigma * color_sigma);
+
+
+	return weight;
+}
+
+void bilateralFilter(const Mat &src, Mat &dest, int r, double color_sigma) {
+
+	CV_Assert(src.size() == dest.size());
+	CV_Assert(src.type() == CV_8UC1);
+	CV_Assert(dest.type() == CV_8UC1);
+
+	double sigma = r / 3.0;
+
+	const int kernelSize = 2 * r + 1;
+
+	Mat srcExpandBoarder;
+	copyMakeBorder(src, srcExpandBoarder, r + 1, r + 1, r + 1, r + 1, cv::BORDER_REFLECT_101);
+
+	for (int y = 0; y < src.rows; ++y) {
+		uchar *imgDest = dest.ptr<uchar>(y);
+		for (int x = 0; x < src.cols; ++x) {
+
+			double denominator = 0.0;
+			double numerator = 0.0;
+			for (int n = 0; n < kernelSize; ++n) {
+				const uchar *imgSrc = srcExpandBoarder.ptr<uchar>(y + n);
+				for (int m = 0; m < kernelSize; ++m) {
+					denominator += pixelValueWeight(srcExpandBoarder, m, n, x, y, sigma, color_sigma);
+					numerator += imgSrc[x + m] * pixelValueWeight(srcExpandBoarder, m, n, x, y, sigma, color_sigma);
+				}
+			}
+			imgDest[x] = numerator / denominator;
+		}
+	}
 }
 
 void UnsharpMask(const Mat &src, Mat &dest, double sigma, int k) {
 
-    CV_Assert(src.size() == dest.size());
+	CV_Assert(src.size() == dest.size());
 
-    gaussianFilter(src, dest, sigma);
+	gaussianFilter(src, dest, sigma * 3);
 
-    Mat diff = dest - src;
+	Mat diff = dest - src;
 
-    dest = src + k * diff;
+	dest = src + k * diff;
 }
 
+enum class FilterType {
+	Gaussian,
+	Laplacian,
+	Bilateral,
+	Unsharp
+};
 
 int main() {
 
-    const string windowName = "Window";
-    namedWindow(windowName, WINDOW_AUTOSIZE);
+	const string windowName = "Window";
+	namedWindow(windowName, WINDOW_AUTOSIZE);
 
-    Mat img = imread("./img/lenna.png", CV_8UC1);
-    Mat dest;
+	Mat img = imread("./img/lenna.png", CV_8UC1);
+	Mat dest;
+	img.copyTo(dest);
 
-    img.copyTo(dest);
+	int type;
+	cout << "Input - Gaussian: 0, Laplacian: 1, Bilateral: 2, Unsharp: 3" << endl;
+	cin >> type;
 
+	switch (static_cast<FilterType>(type)) {
+		case FilterType::Gaussian:
+			gaussianFilter(img, dest, 6);
+			break;
+		case FilterType::Laplacian:
+			laplacianFilter(img, dest);
+			break;
+		case FilterType::Bilateral:
+			bilateralFilter(img, dest, 10, 0.1);
+			break;
+		case FilterType::Unsharp:
+			UnsharpMask(img, dest, 2.0, 4);
+			break;
+	}
 
-    gaussianFilter(img, dest, 2.0);
+	while (1) {
 
-    while (1) {
+		imshow(windowName, dest);
 
-        imshow(windowName, dest);
+		if (waitKey(1) == 'q') {
+			break;
+		}
+	}
 
-        if (waitKey(1) == 'q') {
-            break;
-        }
-    }
+	destroyAllWindows();
 
-    destroyAllWindows();
-
-    return 0;
+	return 0;
 }
-
