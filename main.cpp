@@ -1,6 +1,7 @@
 #define _USE_MATH_DEFINES
 
 #include <vector>
+#include <numeric>
 #include "include.hpp"
 #include "sample_code.hpp"
 #include "plot.hpp"
@@ -14,7 +15,7 @@ T clamp(const T &value, const T &low, const T &high) {
 }
 
 
-uchar filter(const Mat &src, const vector<double> &kernel, int r) {
+uchar filter(const Mat &src, const vector<double> &kernel, int r, double sum = 1) {
 
 	double result = 0;
 
@@ -27,7 +28,7 @@ uchar filter(const Mat &src, const vector<double> &kernel, int r) {
 		}
 	}
 
-	return clamp(static_cast<int>(result), 0, 255);
+	return clamp(static_cast<int>(result / sum), 0, 255);
 }
 
 vector<double> createGaussianKernel(int r) {
@@ -39,8 +40,7 @@ vector<double> createGaussianKernel(int r) {
 
 	for (int y = -r; y <= r; ++y) {
 		for (int x = -r; x <= r; ++x) {
-			data.emplace_back((1.0 / (2.0 * M_PI * sigma2)) *
-			                  exp(-(x * x + y * y) / (2.0 * sigma2)));
+			data.emplace_back(exp(-(x * x + y * y) / (2.0 * sigma2)));
 		}
 	}
 
@@ -62,11 +62,13 @@ void gaussianFilter(const Mat &src, Mat &dest, int r) {
 
 	vector<double> data = createGaussianKernel(r);
 
+	double sum = std::accumulate(data.begin(), data.end(), 0.0);
+
 	for (int y = 0; y < src.rows; ++y) {
 		uchar *imgDest = dest.ptr<uchar>(y);
 		for (int x = 0; x < src.cols; ++x) {
 			Mat partMat = srcExpandBoarder(Rect(x, y, 2 * r + 1, 2 * r + 1));
-			imgDest[x] = filter(partMat, data, r);
+			imgDest[x] = filter(partMat, data, r, sum);
 		}
 	}
 }
@@ -143,11 +145,11 @@ void bilateralFilter(const Mat &src, Mat &dest, int r, double color_sigma) {
 	}
 }
 
-void UnsharpMask(const Mat &src, Mat &dest, int r, int k) {
+void UnsharpMask(const Mat &src, Mat &dest, double sigma, int k) {
 
 	CV_Assert(src.size() == dest.size());
 
-	gaussianFilter(src, dest, r);
+	gaussianFilter(src, dest, 3 * sigma);
 
 	Mat diff = dest - src;
 
@@ -164,20 +166,23 @@ enum class FilterType {
 int main() {
 
 	const string windowName = "Window";
-	const string trackBarName1 = "FilterRadius";
+	const string trackBarName1 = "Sigma";
 	const string trackBarName2 = "SharpeningCoefficient";
 	namedWindow(windowName, WINDOW_AUTOSIZE);
 
 
 	Mat img = imread("./img/lenna.png", CV_8UC1);
+	Mat kodackImg = imread("./img/Kodak/kodim02.png", CV_8UC1);
 	Mat dest;
+	Mat kodackDest;
 	img.copyTo(dest);
+	kodackImg.copyTo(kodackDest);
 
 	int type;
 	cout << "Input - Gaussian: 0, Laplacian: 1, Bilateral: 2, Unsharp: 3" << endl;
 	cin >> type;
 
-	int r = 2;
+	int sigma = 10;
 	int k = 1;
 
 	switch (static_cast<FilterType>(type)) {
@@ -191,21 +196,23 @@ int main() {
 			bilateralFilter(img, dest, 10, 0.1);
 			break;
 		case FilterType::Unsharp:
-			cv::createTrackbar(trackBarName1, windowName, &r, 10);
+			cv::createTrackbar(trackBarName1, windowName, &sigma, 30);
 			cv::createTrackbar(trackBarName2, windowName, &k, 9);
-			UnsharpMask(img, dest, r, k);
+			UnsharpMask(kodackImg, kodackDest, sigma / 10.0, k);
 			break;
 	}
 
 	while (1) {
 
 		if (static_cast<FilterType>(type) == FilterType::Unsharp) {
-			r = cv::getTrackbarPos(trackBarName1, windowName);
+			sigma = cv::getTrackbarPos(trackBarName1, windowName);
 			k = cv::getTrackbarPos(trackBarName2, windowName);
-			UnsharpMask(img, dest, r, k);
+			UnsharpMask(kodackImg, kodackDest, sigma / 10.0, k);
+			imshow(windowName, kodackDest);
+		} else {
+			imshow(windowName, dest);
 		}
 
-		imshow(windowName, dest);
 
 		if (waitKey(1) == 'q') {
 			break;

@@ -13,6 +13,8 @@ opencv2/opencv.hpp
 /Users/siguma/CLionProjects/ImageProcessing/main.cpp
 vector
 -
+numeric
+-
 include.hpp
 /Users/siguma/CLionProjects/ImageProcessing/include.hpp
 sample_code.hpp
