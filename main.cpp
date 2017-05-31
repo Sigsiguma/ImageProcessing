@@ -35,10 +35,30 @@ void nearestNeighbor(const Mat &src, Mat &dest, double xscale, double yscale) {
 
 void bilinear(const Mat &src, Mat &dest, double xscale, double yscale) {
 
+	dest = Mat(src.rows * yscale, src.cols * xscale, CV_8UC3);
+
+	for (int y = 0; y < dest.rows; y++) {
+		double srcY = static_cast<double>(y) / yscale;
+		int floorY = static_cast<int>(srcY);
+		const Vec3b *srcTmp1 = src.ptr<Vec3b>(floorY);
+		const Vec3b *srcTmp2 = src.ptr<Vec3b>(floorY + 1);
+		Vec3b *destTmp = dest.ptr<Vec3b>(y);
+		for (int x = 0; x < dest.cols; x++) {
+			double srcX = static_cast<double>(x) / xscale;
+			int floorX = static_cast<int>(srcX);
+
+			for (int color = 0; color < 3; ++color) {
+				destTmp[x][color] = (floorX + 1 - srcX) * (floorY + 1 - srcY) * srcTmp1[floorX][color] +
+				                (floorX + 1 - srcX) * (srcY - floorY) * srcTmp2[floorX][color] +
+				                (srcX - floorX) * (floorY + 1 - srcY) * srcTmp1[floorX + 1][color] +
+				                (srcX - floorX) * (srcY - floorY) * srcTmp2[floorX + 1][color];
+			}
+		}
+	}
+
 }
 
 void rescale(const Mat &src, Mat &dest, double xscale, double yscale, int interpolation) {
-
 	if (interpolation == CV_INTER_NN) {
 		nearestNeighbor(src, dest, xscale, yscale);
 	} else if (interpolation == CV_INTER_LINEAR) {
@@ -59,9 +79,9 @@ int main() {
 	Mat src = imread("./img/lenna.png");
 	Mat dest;
 
-	rescale(src, dest, 2.0, 2.0, CV_INTER_NN);
+	rescale(src, dest, 0.5, 0.5, CV_INTER_LINEAR);
 	imshow(windowName, dest);
-	resize(src, dest, Size(), 2.0, 2.0, CV_INTER_NN);
+	resize(src, dest, Size(), 0.5, 0.5, CV_INTER_LINEAR);
 	imshow("Method", dest);
 
 	while (1) {
