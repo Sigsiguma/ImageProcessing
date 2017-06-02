@@ -76,30 +76,40 @@ void rescale(const Mat &src, Mat &dest, double xscale, double yscale, int interp
 
 void euclideanTransform(const Mat &src, Mat &dest, double theta, double tx, double ty) {
 
+	double rad = theta * (M_PI / 180);
+
 	dest = Mat::zeros(src.rows * 2, src.cols * 2, CV_8UC3);
 	Mat srcCpy;
 	copyMakeBorder(src, srcCpy, 1, 1, 1, 1, BORDER_REFLECT_101);
 
-	float data[3][3] = {{(float) cos(theta), (float) -sin(theta), (float) tx},
-	                    {(float) sin(theta), (float) cos(theta),  (float) -ty},
-	                    {0,                  0,                   1}};
+	double data[3][3] = {{cos(rad), -sin(rad), tx},
+	                     {sin(rad), cos(rad),  -ty},
+	                     {0,          0,           1}};
 
-	Mat rotateMat(3, 3, CV_32FC1, data);
-	Mat invMat = rotateMat.inv();
+
+	Mat rotateMat(3, 3, CV_64FC1, data);
+
+	for(int y = 0; y < rotateMat.rows; ++y) {
+		for(int x = 0; x < rotateMat.cols; ++x) {
+			cout << rotateMat.ptr<double>(y)[x]	 << endl;
+		}
+	}
+
+	Mat invMat = rotateMat;
 
 	for (int y = 0; y < dest.rows; ++y) {
 		Vec3b *destTmp = dest.ptr<Vec3b>(y);
 		for (int x = 0; x < dest.cols; ++x) {
 
 			//destの中心を0,0とする
-			float pos[3] = {(float) (x - dest.cols / 2), (float) (y - dest.rows / 2), 1.0f};
+			double pos[3] = {x - dest.cols / 2.0, y - dest.rows / 2.0, 1.0};
 
 			//srcでの位置を計算
-			Mat srcPos = invMat * Mat(3, 1, CV_32FC1, pos);
+			Mat srcPos = invMat * Mat(3, 1, CV_64FC1, pos);
 
-			double srcX = srcPos.ptr<float>(0)[0] + 0.5 + srcCpy.cols / 2.0;
+			double srcX = srcPos.ptr<double>(0)[0] + srcCpy.cols / 2.0 + 0.5;
 			int floorX = static_cast<int>(srcX);
-			double srcY = srcPos.ptr<float>(1)[0] + 0.5 + srcCpy.rows / 2.0;
+			double srcY = srcPos.ptr<double>(1)[0] + srcCpy.rows / 2.0 + 0.5;
 			int floorY = static_cast<int>(srcY);
 
 			if (floorX >= 0 && floorX < srcCpy.cols && floorY >= 0 && floorY < srcCpy.rows) {
@@ -123,8 +133,9 @@ int main() {
 	Mat src = imread("./img/lenna.png");
 	Mat dest;
 
-	euclideanTransform(src, dest, 0, 0, 600);
+	euclideanTransform(src, dest, 360, 0, 0);
 	imshow(windowName, dest);
+
 
 	while (1) {
 
