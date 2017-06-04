@@ -84,16 +84,10 @@ void euclideanTransform(const Mat &src, Mat &dest, double theta, double tx, doub
 
 	double data[3][3] = {{cos(rad), -sin(rad), tx},
 	                     {sin(rad), cos(rad),  -ty},
-	                     {0,          0,           1}};
+	                     {0,        0,         1}};
 
 
 	Mat rotateMat(3, 3, CV_64FC1, data);
-
-	for(int y = 0; y < rotateMat.rows; ++y) {
-		for(int x = 0; x < rotateMat.cols; ++x) {
-			cout << rotateMat.ptr<double>(y)[x]	 << endl;
-		}
-	}
 
 	Mat invMat = rotateMat;
 
@@ -133,9 +127,12 @@ int main() {
 	Mat src = imread("./img/lenna.png");
 	Mat dest;
 
-	euclideanTransform(src, dest, 360, 0, 0);
-	imshow(windowName, dest);
-
+	rescale(src, dest, 1.5, 1.5, CV_INTER_NN);
+	imshow("NearestNeighbor", dest);
+	rescale(src, dest, 1.5, 1.5, CV_INTER_LINEAR);
+	imshow("Bilinear", dest);
+	euclideanTransform(src, dest, 60, 0, 0);
+	imshow("Euclid", dest);
 
 	while (1) {
 
