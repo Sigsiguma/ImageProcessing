@@ -14,127 +14,46 @@ T clamp(const T &value, const T &low, const T &high) {
 	return value < low ? low : (value > high ? high : value);
 }
 
-void nearestNeighbor(const Mat &src, Mat &dest, double xscale, double yscale) {
+/*
+Mat LowPassFilter(int row, int col) {
 
-	dest = Mat(src.rows * yscale, src.cols * xscale, CV_8UC3);
-	Mat srcCpy;
-	copyMakeBorder(src, srcCpy, 1, 1, 1, 1, BORDER_REFLECT_101);
+	int range = 10;
+	double sigma = 10.0;
+	Mat filter(row, col, CV_64FC1);
 
-	for (int y = 0; y < dest.rows; y++) {
-		double srcY = static_cast<double>(y) / yscale + 0.5;
-		const Vec3b *srcTmp = srcCpy.ptr<Vec3b>(static_cast<int>(srcY));
-		Vec3b *destTmp = dest.ptr<Vec3b>(y);
-		for (int x = 0; x < dest.cols; x++) {
-			double srcX = static_cast<double>(x) / xscale + 0.5;
-
-			//int型のキャストで切り捨て
-			destTmp[x][0] = srcTmp[static_cast<int>(srcX)][0];
-			destTmp[x][1] = srcTmp[static_cast<int>(srcX)][1];
-			destTmp[x][2] = srcTmp[static_cast<int>(srcX)][2];
-		}
-	}
-}
-
-void bilinear(const Mat &src, Mat &dest, double xscale, double yscale) {
-
-	dest = Mat(src.rows * yscale, src.cols * xscale, CV_8UC3);
-	Mat srcCpy;
-	copyMakeBorder(src, srcCpy, 1, 1, 1, 1, BORDER_REFLECT_101);
-
-	for (int y = 0; y < dest.rows; y++) {
-		double srcY = static_cast<double>(y) / yscale;
-		int floorY = static_cast<int>(srcY);
-		const Vec3b *srcTmp1 = srcCpy.ptr<Vec3b>(floorY);
-		const Vec3b *srcTmp2 = srcCpy.ptr<Vec3b>(floorY + 1);
-		Vec3b *destTmp = dest.ptr<Vec3b>(y);
-		for (int x = 0; x < dest.cols; x++) {
-			double srcX = static_cast<double>(x) / xscale;
-			int floorX = static_cast<int>(srcX);
-
-			for (int color = 0; color < 3; ++color) {
-				destTmp[x][color] = (floorX + 1 - srcX) * (floorY + 1 - srcY) * srcTmp1[floorX][color] +
-				                    (floorX + 1 - srcX) * (srcY - floorY) * srcTmp2[floorX][color] +
-				                    (srcX - floorX) * (floorY + 1 - srcY) * srcTmp1[floorX + 1][color] +
-				                    (srcX - floorX) * (srcY - floorY) * srcTmp2[floorX + 1][color];
-			}
+	for (int y = 0; y < row; ++y) {
+		double *filterTmp = filter.ptr<double>(y);
+		for (int x = 0; x < col; ++x) {
+				filterTmp[x] =  exp(-2 * M_PI * M_PI * sigma * sigma * (x * x + y * y));
 		}
 	}
 
+	return filter;
 }
+ */
 
-void rescale(const Mat &src, Mat &dest, double xscale, double yscale, int interpolation) {
-
-	CV_Assert(xscale != 0.0 && yscale != 0.0);
-
-	if (interpolation == CV_INTER_NN) {
-		nearestNeighbor(src, dest, xscale, yscale);
-	} else if (interpolation == CV_INTER_LINEAR) {
-		bilinear(src, dest, xscale, yscale);
-	}
-}
-
-
-void euclideanTransform(const Mat &src, Mat &dest, double theta, double tx, double ty) {
-
-	double rad = theta * (M_PI / 180);
-
-	dest = Mat::zeros(src.rows * 2, src.cols * 2, CV_8UC3);
-	Mat srcCpy;
-	copyMakeBorder(src, srcCpy, 1, 1, 1, 1, BORDER_REFLECT_101);
-
-	double data[3][3] = {{cos(rad), -sin(rad), tx},
-	                     {sin(rad), cos(rad),  -ty},
-	                     {0,        0,         1}};
-
-
-	Mat rotateMat(3, 3, CV_64FC1, data);
-
-	Mat invMat = rotateMat;
-
-	for (int y = 0; y < dest.rows; ++y) {
-		Vec3b *destTmp = dest.ptr<Vec3b>(y);
-		for (int x = 0; x < dest.cols; ++x) {
-
-			//destの中心を0,0とする
-			double pos[3] = {x - dest.cols / 2.0, y - dest.rows / 2.0, 1.0};
-
-			//srcでの位置を計算
-			Mat srcPos = invMat * Mat(3, 1, CV_64FC1, pos);
-
-			double srcX = srcPos.ptr<double>(0)[0] + srcCpy.cols / 2.0 + 0.5;
-			int floorX = static_cast<int>(srcX);
-			double srcY = srcPos.ptr<double>(1)[0] + srcCpy.rows / 2.0 + 0.5;
-			int floorY = static_cast<int>(srcY);
-
-			if (floorX >= 0 && floorX < srcCpy.cols && floorY >= 0 && floorY < srcCpy.rows) {
-				const Vec3b *srcTmp = srcCpy.ptr<Vec3b>(floorY);
-				destTmp[x][0] = srcTmp[floorX][0];
-				destTmp[x][1] = srcTmp[floorX][1];
-				destTmp[x][2] = srcTmp[floorX][2];
-			}
-
-		}
-	}
-
-}
 
 int main() {
 
 	const string windowName = "Window";
 	namedWindow(windowName, WINDOW_AUTOSIZE);
 
-
-	Mat src = imread("./img/lenna.png");
+	Mat src = imread("./img/lenna.png", IMREAD_GRAYSCALE);
+	src.convertTo(src, CV_64FC1, 1.0 / 255);
 	Mat dest;
+	src.copyTo(dest);
 
-	rescale(src, dest, 1.5, 1.5, CV_INTER_NN);
-	imshow("NearestNeighbor", dest);
-	rescale(src, dest, 1.5, 1.5, CV_INTER_LINEAR);
-	imshow("Bilinear", dest);
-	euclideanTransform(src, dest, 60, 0, 0);
-	imshow("Euclid", dest);
+	dct(src, src);
+	imshow("DCT", src);
+
+//	dest = src.mul(lowPass);
+
+	idct(src, dest);
+
 
 	while (1) {
+
+		imshow(windowName, dest);
 
 		if (waitKey(1) == 'q') {
 			break;

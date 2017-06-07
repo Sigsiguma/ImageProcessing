@@ -1,23 +1,22 @@
 #include "include.hpp"
 #include "sample_code.hpp"
 #include <random>
+#include <time.h>
 
-//ƒAƒ‹ƒtƒ@ƒuƒŒƒ“ƒh
-void alphaBlend(const cv::Mat src1_, const cv::Mat src2_, cv::Mat& dest_, float alpha)
-{
+//ï¿½Aï¿½ï¿½ï¿½tï¿½@ï¿½uï¿½ï¿½ï¿½ï¿½ï¿½h
+void alphaBlend(const cv::Mat src1_, const cv::Mat src2_, cv::Mat &dest_, float alpha) {
 	CV_Assert(src1_.size() == src2_.size());
 
 	cv::Mat src1, src2, dest;
 	src1_.convertTo(src1, CV_32F);
 	src2_.convertTo(src2, CV_32F);
 
-	dest = alpha * src1 + (1.0f - alpha) *src2;
+	dest = alpha * src1 + (1.0f - alpha) * src2;
 
 	dest.convertTo(dest_, CV_8U);
 }
 
-std::vector<uchar> lutNegativePositive()
-{
+std::vector<uchar> lutNegativePositive() {
 	std::vector<uchar> table(256);
 
 	for (int i = 0; i < 256; i++)
@@ -26,8 +25,7 @@ std::vector<uchar> lutNegativePositive()
 	return table;
 }
 
-std::vector<uchar> lutPosterization(int N)
-{
+std::vector<uchar> lutPosterization(int N) {
 	std::vector<uchar> table(256);
 
 	for (int i = 0; i < 256; i++)
@@ -36,9 +34,7 @@ std::vector<uchar> lutPosterization(int N)
 	return table;
 }
 
-// ƒmƒCƒY•t‰Á (1ch)
-void addGaussianNoiseMono(const cv::Mat src, cv::Mat &dst, double sigma)
-{
+void addGaussianNoiseMono(const cv::Mat src, cv::Mat &dst, double sigma) {
 	cv::Mat s;
 	src.convertTo(s, CV_16S);
 	cv::Mat n(s.size(), CV_16S);
@@ -46,47 +42,54 @@ void addGaussianNoiseMono(const cv::Mat src, cv::Mat &dst, double sigma)
 	cv::Mat temp = s + n;
 	temp.convertTo(dst, CV_8U);
 }
-// ƒmƒCƒY•t‰Á (3ch)
-void addGaussianNoise(const cv::Mat src, cv::Mat &dest, double sigma)
-{
+
+// ï¿½mï¿½Cï¿½Yï¿½tï¿½ï¿½ (3ch)
+void addGaussianNoise(const cv::Mat src, cv::Mat &dest, double sigma) {
 	std::vector<cv::Mat> s;
 	std::vector<cv::Mat> d(src.channels());
 	cv::split(src, s);
-	for (int i = 0; i < src.channels(); i++)
-	{
+	for (int i = 0; i < src.channels(); i++) {
 		addGaussianNoiseMono(s[i], d[i], sigma);
 	}
 	cv::merge(d, dest);
 }
 
-void addSpikeNoise(const cv::Mat src, cv::Mat& dest, double noise_rate)
-{
+void addSpikeNoise(const cv::Mat src, cv::Mat &dest, double noise_rate) {
 	dest = src.clone();
 
-	if (noise_rate > 100)
-	{
+	if (noise_rate > 100) {
 		std::cout << " noise_rate 0~100" << std::endl;
 		return;
 	}
-	std::random_device rnd;     // ”ñŒˆ’è“I‚È—”¶¬Ší
-	std::mt19937 mt(rnd());            // ƒƒ‹ƒZƒ“ƒkEƒcƒCƒXƒ^‚Ì32ƒrƒbƒg”ÅAˆø”‚Í‰ŠúƒV[ƒh
+	std::random_device rnd;     // ï¿½ñŒˆ’ï¿½Iï¿½È—ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+	std::mt19937 mt(rnd());            // ï¿½ï¿½ï¿½ï¿½ï¿½Zï¿½ï¿½ï¿½kï¿½Eï¿½cï¿½Cï¿½Xï¿½^ï¿½ï¿½32ï¿½rï¿½bï¿½gï¿½ÅAï¿½ï¿½ï¿½ï¿½ï¿½Íï¿½ï¿½ï¿½ï¿½Vï¿½[ï¿½h
 
 	int data_size = src.size().area();
 
 	int p;
-	for (int i = 0; i < data_size; i++)
-	{
-		if (double(mt() % 10000) / 100.0 < noise_rate)
-		{
-			if (dest.channels() == 3)
-			{
+	for (int i = 0; i < data_size; i++) {
+		if (double(mt() % 10000) / 100.0 < noise_rate) {
+			if (dest.channels() == 3) {
 				dest.ptr<cv::Vec3b>(0)[i] = cv::Vec3b(255, 255, 255) * int(mt() % 2);
-			}
-			else
-			{
+			} else {
 				dest.ptr<uchar>(0)[i] = 255 * (rand() % 2);
 			}
 		}
 	}
 
+}
+
+//DCTï¿½pï¿½Kï¿½Eï¿½Vï¿½Aï¿½ï¿½ï¿½}ï¿½Xï¿½N
+void getGaussianMaskDCT(cv::Mat &mask, cv::Size size, double sigma) {
+	mask = cv::Mat::zeros(size, CV_32F);
+
+	float coeff = (-2.0f * M_PI * M_PI * sigma * sigma);
+	for (int y = 0; y < size.height; y++) {
+		for (int x = 0; x < size.width; x++) {
+			float u = x / (2.0f * size.width);
+			float v = y / (2.0f * size.height);
+
+			mask.at<float>(y, x) = exp(coeff * (u * u + v * v));
+		}
+	}
 }

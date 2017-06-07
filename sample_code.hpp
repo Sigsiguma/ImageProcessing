@@ -1,12 +1,15 @@
 #pragma once
 
-//第2回課題用
+#define IMAGE_PATH "../img/"
+#define KODAK_IMAGE(id) IMAGE_PATH"Kodak/kodim" CVAUX_STR(id)".png"
+#define HIGHRESOLUTION�QIMAGE(name)"highResolution/" CVAUX_STR(name)".png"
+
 void alphaBlend(const cv::Mat src1_, const cv::Mat src2_, cv::Mat& dest_, float alpha);
 
-//第3回課題用
 std::vector<uchar> lutNegativePositive();
 std::vector<uchar> lutPosterization(int N);
 
-//第4回課題用
 void addGaussianNoise(const cv::Mat src, cv::Mat &dst, double sigma);
 void addSpikeNoise(const cv::Mat src, cv::Mat& dest, double noise_rate);
+
+void getGaussianMaskDCT(cv::Mat& MMask, cv::Size size, double sigma);
