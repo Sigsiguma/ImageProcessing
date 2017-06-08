@@ -46,6 +46,21 @@ void gaussianFilter(const Mat& src, Mat& dest, double sigma) {
 	idct(dest, dest);
 }
 
+void gaussianNoiseDCT(const Mat& src, double sigma, int r) {
+	Mat noise;
+	addGaussianNoise(src, noise, 2.0);
+	imshow("NOISE", noise);
+	noise.convertTo(noise, CV_32FC1, 1.0 / 255);
+	dct(noise, noise);
+	Mat lowPass;
+	getLowPassDCT(lowPass, Size(noise.cols, noise.rows), r);
+	lowPass = noise.mul(lowPass);
+	idct(lowPass, lowPass);
+	noise.convertTo(noise, CV_8U);
+	lowPass.convertTo(lowPass, CV_8U);
+	cout << "PSNR: " << PSNR(noise, lowPass) << endl;
+}
+
 
 int main() {
 
@@ -58,6 +73,8 @@ int main() {
 	src.copyTo(dest);
 
 	gaussianFilter(src, dest, 3.0);
+
+	gaussianNoiseDCT(src, 2.0, 100);
 
 	while (1) {
 
