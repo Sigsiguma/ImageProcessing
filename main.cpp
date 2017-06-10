@@ -69,7 +69,7 @@ void getLowPassDCT(Mat &filter, Size size, int r) {
 	}
 }
 
-void LowPassFilter(const Mat src, Mat &dest, int r) {
+void lowPassFilter(const Mat src, Mat &dest, int r) {
 	Mat dctSrc;
 	dct(src, dctSrc);
 	Mat lowPass;
@@ -92,7 +92,7 @@ void gaussianNoiseDCT(const Mat src, double sigma, int r) {
 	addGaussianNoise(src, noise, sigma);
 	noise.convertTo(noise, CV_32FC1);
 	Mat result;
-	LowPassFilter(noise, result, r);
+	lowPassFilter(noise, result, r);
 	Mat srcU;
 	src.convertTo(srcU, CV_8U, 255);
 	result.convertTo(result, CV_8U, 255);
@@ -106,7 +106,7 @@ void spikeNoiseDCT(const Mat src, double noise_rate, int r) {
 	addSpikeNoise(srcU, noise, noise_rate);
 	noise.convertTo(noise, CV_32FC1, 1.0 / 255);
 	Mat result;
-	LowPassFilter(noise, result, r);
+	lowPassFilter(noise, result, r);
 	result.convertTo(result, CV_8U, 255);
 	cout << "PSNR:" << PSNR(srcU, result) << endl;
 }
@@ -155,6 +155,17 @@ void spikeNoiseBilateral(const Mat src, double noise_rate, int r) {
 	cout << "PSNR:" << PSNR(srcU, result) << endl;
 }
 
+enum class MethodType {
+	LowPassFilter,
+	GaussianFilter,
+	GaussianNoiseDCT,
+	SpikeNoiseDCT,
+	GaussianNoiseMedian,
+	SpikeNoiseMedian,
+	GaussianNoiseBilateral,
+	SpikeNoiseBilateral
+};
+
 
 int main() {
 
@@ -166,19 +177,37 @@ int main() {
 	Mat dest;
 	src.copyTo(dest);
 
-	gaussianFilter(src, dest, 3.0);
+	int type;
+	cout << "0: LowPassFilter, 1: GaussianFilter, 2: GaussianNoiseDCt, 3: SpikeNoiseDCT, 4: GaussianNoiseMedian" << endl;
+	cout << "5: SpikeNoiseMedian, 6: GaussianNoiseBilateral, 7: SpikeNoiseBilateral" << endl;
+	cin >> type;
 
-//	gaussianNoiseDCT(src, 1.0, 200);
-
-//	spikeNoiseDCT(src, 20.0, 100);
-
-//	gaussianNoiseMedian(src, 1.0, 13);
-
-//	spikeNoiseMedian(src, 20.0, 13);
-
-//	gaussianNoiseBilateral(src, 1.0, 6);
-
-	spikeNoiseBilateral(src, 20.0, 6);
+	switch (static_cast<MethodType>(type)) {
+		case MethodType::LowPassFilter:
+			lowPassFilter(src, dest, 100);
+			break;
+		case MethodType::GaussianFilter:
+			gaussianFilter(src, dest, 3.0);
+			break;
+		case MethodType::GaussianNoiseDCT:
+			gaussianNoiseDCT(src, 1.0, 200);
+			break;
+		case MethodType::SpikeNoiseDCT:
+			spikeNoiseDCT(src, 20.0, 100);
+			break;
+		case MethodType::GaussianNoiseMedian:
+			gaussianNoiseMedian(src, 1.0, 13);
+			break;
+		case MethodType::SpikeNoiseMedian:
+			spikeNoiseMedian(src, 20.0, 13);
+			break;
+		case MethodType::GaussianNoiseBilateral:
+			gaussianNoiseBilateral(src, 1.0, 6);
+			break;
+		case MethodType::SpikeNoiseBilateral:
+			spikeNoiseBilateral(src, 20.0, 6);
+			break;
+	}
 
 	while (1) {
 
