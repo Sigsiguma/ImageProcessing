@@ -2,7 +2,7 @@
 
 #define IMAGE_PATH "../img/"
 #define KODAK_IMAGE(id) IMAGE_PATH"Kodak/kodim" CVAUX_STR(id)".png"
-#define HIGHRESOLUTIONÅQIMAGE(name)"highResolution/" CVAUX_STR(name)".png"
+#define HIGHRESOLUTIONÔøΩQIMAGE(name)"highResolution/" CVAUX_STR(name)".png"
 
 void alphaBlend(const cv::Mat src1_, const cv::Mat src2_, cv::Mat& dest_, float alpha);
 
