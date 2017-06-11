@@ -35,7 +35,7 @@ void bilateralFilter(const Mat &src, Mat &dest, int r, double color_sigma) {
 	const int kernelSize = 2 * r + 1;
 
 	Mat srcExpandBoarder;
-	copyMakeBorder(src, srcExpandBoarder, r + 1, r + 1, r + 1, r + 1, cv::BORDER_REFLECT_101);
+	copyMakeBorder(src, srcExpandBoarder, r, r, r, r, cv::BORDER_REFLECT_101);
 
 	for (int y = 0; y < src.rows; ++y) {
 		uchar *imgDest = dest.ptr<uchar>(y);
@@ -76,6 +76,7 @@ void lowPassFilter(const Mat src, Mat &dest, int r) {
 	getLowPassDCT(lowPass, Size(src.cols, src.rows), r);
 	dest = dctSrc.mul(lowPass);
 	idct(dest, dest);
+	imshow("LowPassFilter", dest);
 }
 
 void gaussianFilter(const Mat src, Mat &dest, double sigma) {
@@ -85,27 +86,31 @@ void gaussianFilter(const Mat src, Mat &dest, double sigma) {
 	getGaussianMaskDCT(gause, Size(src.cols, src.rows), sigma);
 	dest = dctSrc.mul(gause);
 	idct(dest, dest);
+	imshow("GaussianFilter", dest);
+//	dest.convertTo(dest, CV_8U, 255);
+//	imwrite("Gaussian.png", dest);
 }
 
 void gaussianNoiseDCT(const Mat src, double sigma, int r) {
-	Mat noise;
-	addGaussianNoise(src, noise, sigma);
-	noise.convertTo(noise, CV_32FC1);
-	Mat result;
-	lowPassFilter(noise, result, r);
 	Mat srcU;
 	src.convertTo(srcU, CV_8U, 255);
+	Mat noise;
+	addGaussianNoise(srcU, noise, sigma);
+	noise.convertTo(noise, CV_32F, 1.0 / 255);
+	Mat result;
+	lowPassFilter(noise, result, r);
 	result.convertTo(result, CV_8U, 255);
 	imshow("GaussianNoiseDCT", result);
 	cout << "PSNR: " << PSNR(srcU, result) << endl;
 }
+
 
 void spikeNoiseDCT(const Mat src, double noise_rate, int r) {
 	Mat srcU;
 	src.convertTo(srcU, CV_8U, 255);
 	Mat noise;
 	addSpikeNoise(srcU, noise, noise_rate);
-	noise.convertTo(noise, CV_32FC1, 1.0 / 255);
+	noise.convertTo(noise, CV_32F, 1.0 / 255);
 	Mat result;
 	lowPassFilter(noise, result, r);
 	result.convertTo(result, CV_8U, 255);
@@ -114,13 +119,12 @@ void spikeNoiseDCT(const Mat src, double noise_rate, int r) {
 }
 
 void gaussianNoiseMedian(const Mat src, double sigma, int kernel) {
-	Mat noise;
-	addGaussianNoise(src, noise, sigma);
-	noise.convertTo(noise, CV_8U, 255);
-	Mat result;
-	medianBlur(noise, result, kernel);
 	Mat srcU;
 	src.convertTo(srcU, CV_8U, 255);
+	Mat noise;
+	addGaussianNoise(srcU, noise, sigma);
+	Mat result;
+	medianBlur(noise, result, kernel);
 	imshow("GaussianNoiseMedian", result);
 	cout << "PSNR:" << PSNR(srcU, result) << endl;
 }
@@ -137,15 +141,14 @@ void spikeNoiseMedian(const Mat src, double noise_rate, int kernel) {
 }
 
 void gaussianNoiseBilateral(const Mat src, double sigma, int r) {
-	Mat noise;
-	addGaussianNoise(src, noise, sigma);
-	noise.convertTo(noise, CV_8U, 255);
-	Mat result;
-	noise.copyTo(result);
-	bilateralFilter(noise, result, r, 0.1);
-	imshow("GaussianNoiseBilateral", result);
 	Mat srcU;
 	src.convertTo(srcU, CV_8U, 255);
+	Mat noise;
+	addGaussianNoise(srcU, noise, sigma);
+	Mat result;
+	noise.copyTo(result);
+	bilateralFilter(noise, result, r, 15.0);
+	imshow("GaussianNoiseBilateral", result);
 	cout << "PSNR:" << PSNR(srcU, result) << endl;
 }
 
@@ -159,6 +162,7 @@ void spikeNoiseBilateral(const Mat src, double noise_rate, int r) {
 	bilateralFilter(noise, result, r, 0.01);
 	imshow("SpikeNoiseBilateral", result);
 	cout << "PSNR:" << PSNR(srcU, result) << endl;
+	imwrite("SpikeNoiseBilateral.png", result);
 }
 
 enum class MethodType {
@@ -179,7 +183,7 @@ int main() {
 	namedWindow(windowName, WINDOW_AUTOSIZE);
 
 	Mat src = imread("./img/Kodak/kodim23.png", IMREAD_GRAYSCALE);
-	src.convertTo(src, CV_32FC1, 1.0 / 255);
+	src.convertTo(src, CV_32F, 1.0 / 255);
 	Mat dest;
 	src.copyTo(dest);
 
@@ -197,19 +201,19 @@ int main() {
 			gaussianFilter(src, dest, 3.0);
 			break;
 		case MethodType::GaussianNoiseDCT:
-			gaussianNoiseDCT(src, 1.0, 100);
+			gaussianNoiseDCT(src, 15.0, 100);
 			break;
 		case MethodType::SpikeNoiseDCT:
 			spikeNoiseDCT(src, 20.0, 100);
 			break;
 		case MethodType::GaussianNoiseMedian:
-			gaussianNoiseMedian(src, 2.0, 13);
+			gaussianNoiseMedian(src, 15.0, 13);
 			break;
 		case MethodType::SpikeNoiseMedian:
 			spikeNoiseMedian(src, 20.0, 13);
 			break;
 		case MethodType::GaussianNoiseBilateral:
-			gaussianNoiseBilateral(src, 2.0, 6);
+			gaussianNoiseBilateral(src, 15.0, 6);
 			break;
 		case MethodType::SpikeNoiseBilateral:
 			spikeNoiseBilateral(src, 20.0, 6);
@@ -217,8 +221,6 @@ int main() {
 	}
 
 	while (1) {
-
-		imshow(windowName, dest);
 
 		if (waitKey(1) == 'q') {
 			break;
