@@ -96,6 +96,7 @@ void gaussianNoiseDCT(const Mat src, double sigma, int r) {
 	Mat srcU;
 	src.convertTo(srcU, CV_8U, 255);
 	result.convertTo(result, CV_8U, 255);
+	imshow("GaussianNoiseDCT", result);
 	cout << "PSNR: " << PSNR(srcU, result) << endl;
 }
 
@@ -108,6 +109,7 @@ void spikeNoiseDCT(const Mat src, double noise_rate, int r) {
 	Mat result;
 	lowPassFilter(noise, result, r);
 	result.convertTo(result, CV_8U, 255);
+	imshow("SpikeNoiseDCT", result);
 	cout << "PSNR:" << PSNR(srcU, result) << endl;
 }
 
@@ -119,6 +121,7 @@ void gaussianNoiseMedian(const Mat src, double sigma, int kernel) {
 	medianBlur(noise, result, kernel);
 	Mat srcU;
 	src.convertTo(srcU, CV_8U, 255);
+	imshow("GaussianNoiseMedian", result);
 	cout << "PSNR:" << PSNR(srcU, result) << endl;
 }
 
@@ -129,6 +132,7 @@ void spikeNoiseMedian(const Mat src, double noise_rate, int kernel) {
 	addSpikeNoise(srcU, noise, noise_rate);
 	Mat result;
 	medianBlur(noise, result, kernel);
+	imshow("SpikeNoiseMedian", result);
 	cout << "PSNR:" << PSNR(srcU, result) << endl;
 }
 
@@ -138,7 +142,8 @@ void gaussianNoiseBilateral(const Mat src, double sigma, int r) {
 	noise.convertTo(noise, CV_8U, 255);
 	Mat result;
 	noise.copyTo(result);
-	bilateralFilter(noise, result, r, 0.01);
+	bilateralFilter(noise, result, r, 0.1);
+	imshow("GaussianNoiseBilateral", result);
 	Mat srcU;
 	src.convertTo(srcU, CV_8U, 255);
 	cout << "PSNR:" << PSNR(srcU, result) << endl;
@@ -152,6 +157,7 @@ void spikeNoiseBilateral(const Mat src, double noise_rate, int r) {
 	Mat result;
 	noise.copyTo(result);
 	bilateralFilter(noise, result, r, 0.01);
+	imshow("SpikeNoiseBilateral", result);
 	cout << "PSNR:" << PSNR(srcU, result) << endl;
 }
 
@@ -178,7 +184,8 @@ int main() {
 	src.copyTo(dest);
 
 	int type;
-	cout << "0: LowPassFilter, 1: GaussianFilter, 2: GaussianNoiseDCt, 3: SpikeNoiseDCT, 4: GaussianNoiseMedian" << endl;
+	cout << "0: LowPassFilter, 1: GaussianFilter, 2: GaussianNoiseDCt, 3: SpikeNoiseDCT, 4: GaussianNoiseMedian"
+	     << endl;
 	cout << "5: SpikeNoiseMedian, 6: GaussianNoiseBilateral, 7: SpikeNoiseBilateral" << endl;
 	cin >> type;
 
@@ -190,19 +197,19 @@ int main() {
 			gaussianFilter(src, dest, 3.0);
 			break;
 		case MethodType::GaussianNoiseDCT:
-			gaussianNoiseDCT(src, 1.0, 200);
+			gaussianNoiseDCT(src, 1.0, 100);
 			break;
 		case MethodType::SpikeNoiseDCT:
 			spikeNoiseDCT(src, 20.0, 100);
 			break;
 		case MethodType::GaussianNoiseMedian:
-			gaussianNoiseMedian(src, 1.0, 13);
+			gaussianNoiseMedian(src, 2.0, 13);
 			break;
 		case MethodType::SpikeNoiseMedian:
 			spikeNoiseMedian(src, 20.0, 13);
 			break;
 		case MethodType::GaussianNoiseBilateral:
-			gaussianNoiseBilateral(src, 1.0, 6);
+			gaussianNoiseBilateral(src, 2.0, 6);
 			break;
 		case MethodType::SpikeNoiseBilateral:
 			spikeNoiseBilateral(src, 20.0, 6);
