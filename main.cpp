@@ -1,7 +1,6 @@
 #define _USE_MATH_DEFINES
 
 #include <vector>
-#include <numeric>
 #include "include.hpp"
 #include "sample_code.hpp"
 #include "plot.hpp"
@@ -15,8 +14,8 @@ void Yellow(const Mat src, const Mat srcHSV) {
 	cv::inRange(srcHSV, Scalar(20, 175, 100), Scalar(40, 255, 255), mask);
 	imshow("Mask", mask);
 
-	morphologyEx(mask, mask, CV_MOP_OPEN, Mat(3, 3, CV_8U), Point(-1, -1), 2);
-	morphologyEx(mask, mask, CV_MOP_CLOSE, Mat(3, 3, CV_8U), Point(-1, -1), 16);
+	morphologyEx(mask, mask, MORPH_OPEN, Mat(), Point(-1, -1), 2);
+	morphologyEx(mask, mask, MORPH_CLOSE, Mat(), Point(-1, -1), 16);
 	imshow("AfterMask", mask);
 
 	//作成したマスクと論理積を取る
@@ -32,8 +31,8 @@ void Orange(const Mat src, const Mat srcHSV) {
 
 	imshow("Mask", mask);
 
-	morphologyEx(mask, mask, CV_MOP_OPEN, Mat(3, 3, CV_8U), Point(-1, -1), 1);
-	morphologyEx(mask, mask, CV_MOP_CLOSE, Mat(3, 3, CV_8U), Point(-1, -1), 10);
+	morphologyEx(mask, mask, MORPH_OPEN, Mat(), Point(-1, -1), 1);
+	morphologyEx(mask, mask, MORPH_CLOSE, Mat(), Point(-1, -1), 10);
 	imshow("AfterMask", mask);
 
 	//作成したマスクと論理積を取る
@@ -45,11 +44,12 @@ void Orange(const Mat src, const Mat srcHSV) {
 void Green(const Mat src, const Mat srcHSV) {
 	//マスク作成
 	Mat mask;
-	cv::inRange(srcHSV, Scalar(40, 100, 20), Scalar(100, 255, 255), mask);
+	cv::inRange(srcHSV, Scalar(37, 68, 0), Scalar(57, 255, 255), mask);
 
 	imshow("Mask", mask);
 
-	morphologyEx(mask, mask, CV_MOP_CLOSE, Mat(3, 3, CV_8U), Point(-1, -1), 20);
+	morphologyEx(mask, mask, MORPH_OPEN, Mat(), Point(-1, -1), 3);
+	morphologyEx(mask, mask, MORPH_CLOSE, Mat(), Point(-1, -1), 20);
 	imshow("AfterMask", mask);
 
 	//作成したマスクと論理積を取る
@@ -61,11 +61,13 @@ void Green(const Mat src, const Mat srcHSV) {
 void Pink(const Mat src, const Mat srcHSV) {
 	//マスク作成
 	Mat mask;
-	cv::inRange(srcHSV, Scalar(150, 10, 20), Scalar(180, 255, 255), mask);
+	cv::inRange(srcHSV, Scalar(4, 0, 0), Scalar(167, 255, 255), mask);
 
+	mask = ~mask;
 	imshow("Mask", mask);
 
-	morphologyEx(mask, mask, CV_MOP_CLOSE, Mat(3, 3, CV_8U), Point(-1, -1), 20);
+	morphologyEx(mask, mask, MORPH_OPEN, Mat(), Point(-1, -1), 2);
+	morphologyEx(mask, mask, MORPH_CLOSE, Mat(), Point(-1, -1), 10);
 	imshow("AfterMask", mask);
 
 	//作成したマスクと論理積を取る
@@ -77,11 +79,12 @@ void Pink(const Mat src, const Mat srcHSV) {
 void Blue(const Mat src, const Mat srcHSV) {
 	//マスク作成
 	Mat mask;
-	cv::inRange(srcHSV, Scalar(112, 20, 0), Scalar(125, 255, 255), mask);
+	cv::inRange(srcHSV, Scalar(110, 40, 0), Scalar(180, 147, 137), mask);
 
 	imshow("Mask", mask);
 
-	morphologyEx(mask, mask, CV_MOP_CLOSE, Mat(3, 3, CV_8U), Point(-1, -1), 20);
+	morphologyEx(mask, mask, MORPH_OPEN, Mat(), Point(-1, -1), 1);
+	morphologyEx(mask, mask, MORPH_CLOSE, Mat(), Point(-1, -1), 20);
 	imshow("AfterMask", mask);
 
 	//作成したマスクと論理積を取る
@@ -89,6 +92,14 @@ void Blue(const Mat src, const Mat srcHSV) {
 	bitwise_and(src, src, result, mask);
 	imshow("Reuslt", result);
 }
+
+enum class Color {
+	Orange,
+	Yellow,
+	Green,
+	Pink,
+	Blue
+};
 
 int main() {
 
@@ -100,11 +111,27 @@ int main() {
 	Mat srcHSV;
 	cvtColor(src, srcHSV, CV_BGR2HSV);
 
-//	Orange(src, srcHSV);
-//	Yellow(src, srcHSV);
-//	Green(src, srcHSV);
-//	Pink(src, srcHSV);
-	Blue(src, srcHSV);
+	int type;
+	cout << "0: Orange, 1: Yellow, 2: Green, 3: Pink, 4: Blue" << endl;
+	cin >> type;
+
+	switch (static_cast<Color>(type)) {
+		case Color::Orange:
+			Orange(src, srcHSV);
+			break;
+		case Color::Yellow:
+			Yellow(src, srcHSV);
+			break;
+		case Color::Green:
+			Green(src, srcHSV);
+			break;
+		case Color::Pink:
+			Pink(src, srcHSV);
+			break;
+		case Color::Blue:
+			Blue(src, srcHSV);
+			break;
+	}
 
 	while (1) {
 		if (waitKey(1) == 'q') {
