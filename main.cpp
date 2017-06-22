@@ -3,6 +3,7 @@
 #include <vector>
 #include <numeric>
 #include <algorithm>
+#include <chrono>
 #include "include.hpp"
 #include "sample_code.hpp"
 #include "plot.hpp"
@@ -10,37 +11,19 @@
 using namespace std;
 using namespace cv;
 
-uchar filter(const Mat &src, const vector<double> &kernel, int r, double sum = 1) {
+class ParallelGaussian : public ParallelLoopBody {
+public:
+	ParallelGaussian(Mat& src, Mat& dest, int r, float sigma) : src_(src), dest_(dest), r_(r), sigma_(sigma) {}
 
-	double result = 0;
-
-	const int kernelSize = 2 * r + 1;
-
-	for (int y = 0; y < kernelSize; ++y) {
-		const Vec3b *imgSrc = src.ptr<Vec3b>(y);
-		for (int x = 0; x < kernelSize; ++x) {
-			result += imgSrc[x][0] * kernel.at(y * kernelSize + x);
-		}
+	void operator()(const Range& range) const {
 	}
 
-	return static_cast<int>(result / sum);
-}
-
-vector<double> createGaussianKernel(int r) {
-
-	vector<double> data;
-
-	double sigma = r / 3.0;
-	double sigma2 = sigma * sigma;
-
-	for (int y = -r; y <= r; ++y) {
-		for (int x = -r; x <= r; ++x) {
-			data.emplace_back(exp(-(x * x + y * y) / (2.0 * sigma2)));
-		}
-	}
-
-	return data;
-}
+private:
+	Mat src_;
+	Mat dest_;
+	int r_;
+	float sigma_;
+};
 
 
 void GaussianFilter_sugiura(const Mat &src, Mat &dest, int r, float sigma) {
@@ -53,12 +36,22 @@ void GaussianFilter_sugiura(const Mat &src, Mat &dest, int r, float sigma) {
 	//端のときに範囲外にならないようにフィルタ半径分全方向に広げる
 	copyMakeBorder(src, srcExpandBoarder, r, r, r, r, cv::BORDER_REFLECT_101);
 
-	vector<double> kernel = createGaussianKernel(r);
+	vector<double> kernel;
+	{
+		float sigma2 = sigma * sigma;
+
+		for (int y = -r; y <= r; ++y) {
+			for (int x = -r; x <= r; ++x) {
+				kernel.emplace_back(exp(-(x * x + y * y) / (2.0 * sigma2)));
+			}
+		}
+	}
+
 
 	double sum = std::accumulate(kernel.begin(), kernel.end(), 0.0);
 
 	for (int y = 0; y < src.rows; ++y) {
-		Vec3b* destSrc = dest.ptr<Vec3b>(y);
+		Vec3b *destSrc = dest.ptr<Vec3b>(y);
 		for (int x = 0; x < src.cols; ++x) {
 			Mat partMat = srcExpandBoarder(Rect(x, y, 2 * r + 1, 2 * r + 1));
 			const int kernelSize = 2 * r + 1;
@@ -79,14 +72,36 @@ void GaussianFilter_sugiura(const Mat &src, Mat &dest, int r, float sigma) {
 	}
 }
 
+
+void CheckTime(const Mat &src, Mat &dest, int r) {
+	auto start = chrono::system_clock::now();
+	GaussianFilter_sugiura(src, dest, r, r / 3.0f);
+	auto end = chrono::system_clock::now();
+	auto time = end - start;
+	auto msec = chrono::duration_cast<std::chrono::milliseconds>(time).count();
+	std::cout << "Time: " << msec << endl;
+}
+
+
 int main() {
 
 	Mat src = imread("./img/Kodak/kodim03.png");
 	Mat dest;
 	src.copyTo(dest);
 	imshow("SRC", src);
-	GaussianFilter_sugiura(src, dest, 5, 5 / 3.0f);
+
+	int r = 5;
+	int kernelSize = r * 2 + 1;
+
+	CheckTime(src, dest, r);
 	imshow("Gaussian", dest);
+
+	Mat dest2;
+	GaussianBlur(src, dest2, Size(kernelSize, kernelSize), r / 3.0);
+
+	imshow("Gaussian2", dest2);
+
+	cout << PSNR(dest, dest2) << endl;
 
 	while (1) {
 		if (waitKey(1) == 'q') {
