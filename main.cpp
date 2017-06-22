@@ -11,22 +11,7 @@
 using namespace std;
 using namespace cv;
 
-class ParallelGaussian : public ParallelLoopBody {
-public:
-	ParallelGaussian(Mat& src, Mat& dest, int r, float sigma) : src_(src), dest_(dest), r_(r), sigma_(sigma) {}
-
-	void operator()(const Range& range) const {
-	}
-
-private:
-	Mat src_;
-	Mat dest_;
-	int r_;
-	float sigma_;
-};
-
-
-void GaussianFilter_sugiura(const Mat &src, Mat &dest, int r, float sigma) {
+void GaussianFilter(const Mat &src, Mat &dest, int r, float sigma) {
 
 	CV_Assert(src.size() == dest.size());
 	CV_Assert(src.type() == CV_8UC3);
@@ -73,8 +58,32 @@ void GaussianFilter_sugiura(const Mat &src, Mat &dest, int r, float sigma) {
 }
 
 
-void CheckTime(const Mat &src, Mat &dest, int r) {
+class ParallelGaussian : public ParallelLoopBody {
+public:
+	ParallelGaussian(const Mat &src, Mat &dest, int r, float sigma) : src_(src), dest_(dest), r_(r), sigma_(sigma) {}
+
+	void operator()(const Range &range) const {
+		int row0 = range.start;
+		int row1 = range.end;
+		Mat srcStripe = src_.rowRange(row0, row1);
+		Mat destStripe = dest_.rowRange(row0, row1);
+		GaussianFilter(srcStripe, destStripe, r_, sigma_);
+	}
+
+private:
+	const Mat src_;
+	const Mat dest_;
+	const int r_;
+	const float sigma_;
+};
+
+void GaussianFilter_sugiura(const Mat &src, Mat &dest, int r, float sigma) {
+	parallel_for_(Range(0, dest.rows), ParallelGaussian(src, dest, r, r / 3.0f));
+}
+
+void CheckTime(Mat &src, Mat &dest, int r) {
 	auto start = chrono::system_clock::now();
+//	GaussianFilter(src, dest, r, r / 3.0f);
 	GaussianFilter_sugiura(src, dest, r, r / 3.0f);
 	auto end = chrono::system_clock::now();
 	auto time = end - start;
@@ -98,7 +107,6 @@ int main() {
 
 	Mat dest2;
 	GaussianBlur(src, dest2, Size(kernelSize, kernelSize), r / 3.0);
-
 	imshow("Gaussian2", dest2);
 
 	cout << PSNR(dest, dest2) << endl;
