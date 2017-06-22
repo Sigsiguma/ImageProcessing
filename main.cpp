@@ -1,6 +1,8 @@
 #define _USE_MATH_DEFINES
 
 #include <vector>
+#include <numeric>
+#include <algorithm>
 #include "include.hpp"
 #include "sample_code.hpp"
 #include "plot.hpp"
@@ -8,130 +10,83 @@
 using namespace std;
 using namespace cv;
 
-void Yellow(const Mat src, const Mat srcHSV) {
-	//マスク作成
-	Mat mask;
-	cv::inRange(srcHSV, Scalar(20, 175, 100), Scalar(40, 255, 255), mask);
-	imshow("Mask", mask);
+uchar filter(const Mat &src, const vector<double> &kernel, int r, double sum = 1) {
 
-	morphologyEx(mask, mask, MORPH_OPEN, Mat(), Point(-1, -1), 2);
-	morphologyEx(mask, mask, MORPH_CLOSE, Mat(), Point(-1, -1), 16);
-	imshow("AfterMask", mask);
+	double result = 0;
 
-	//作成したマスクと論理積を取る
-	Mat result;
-	bitwise_and(src, src, result, mask);
-	imshow("Reuslt", result);
+	const int kernelSize = 2 * r + 1;
+
+	for (int y = 0; y < kernelSize; ++y) {
+		const Vec3b *imgSrc = src.ptr<Vec3b>(y);
+		for (int x = 0; x < kernelSize; ++x) {
+			result += imgSrc[x][0] * kernel.at(y * kernelSize + x);
+		}
+	}
+
+	return static_cast<int>(result / sum);
 }
 
-void Orange(const Mat src, const Mat srcHSV) {
-	//マスク作成
-	Mat mask;
-	cv::inRange(srcHSV, Scalar(5, 160, 100), Scalar(20, 255, 255), mask);
+vector<double> createGaussianKernel(int r) {
 
-	imshow("Mask", mask);
+	vector<double> data;
 
-	morphologyEx(mask, mask, MORPH_OPEN, Mat(), Point(-1, -1), 1);
-	morphologyEx(mask, mask, MORPH_CLOSE, Mat(), Point(-1, -1), 10);
-	imshow("AfterMask", mask);
+	double sigma = r / 3.0;
+	double sigma2 = sigma * sigma;
 
-	//作成したマスクと論理積を取る
-	Mat result;
-	bitwise_and(src, src, result, mask);
-	imshow("Reuslt", result);
+	for (int y = -r; y <= r; ++y) {
+		for (int x = -r; x <= r; ++x) {
+			data.emplace_back(exp(-(x * x + y * y) / (2.0 * sigma2)));
+		}
+	}
+
+	return data;
 }
 
-void Green(const Mat src, const Mat srcHSV) {
-	//マスク作成
-	Mat mask;
-	cv::inRange(srcHSV, Scalar(37, 68, 0), Scalar(57, 255, 255), mask);
 
-	imshow("Mask", mask);
+void GaussianFilter_sugiura(const Mat &src, Mat &dest, int r, float sigma) {
 
-	morphologyEx(mask, mask, MORPH_OPEN, Mat(), Point(-1, -1), 3);
-	morphologyEx(mask, mask, MORPH_CLOSE, Mat(), Point(-1, -1), 20);
-	imshow("AfterMask", mask);
+	CV_Assert(src.size() == dest.size());
+	CV_Assert(src.type() == CV_8UC3);
+	CV_Assert(dest.type() == CV_8UC3);
 
-	//作成したマスクと論理積を取る
-	Mat result;
-	bitwise_and(src, src, result, mask);
-	imshow("Reuslt", result);
+	Mat srcExpandBoarder;
+	//端のときに範囲外にならないようにフィルタ半径分全方向に広げる
+	copyMakeBorder(src, srcExpandBoarder, r, r, r, r, cv::BORDER_REFLECT_101);
+
+	vector<double> kernel = createGaussianKernel(r);
+
+	double sum = std::accumulate(kernel.begin(), kernel.end(), 0.0);
+
+	for (int y = 0; y < src.rows; ++y) {
+		Vec3b* destSrc = dest.ptr<Vec3b>(y);
+		for (int x = 0; x < src.cols; ++x) {
+			Mat partMat = srcExpandBoarder(Rect(x, y, 2 * r + 1, 2 * r + 1));
+			const int kernelSize = 2 * r + 1;
+			double result[3] = {0.0, 0.0, 0.0};
+			for (int u = 0; u < kernelSize; ++u) {
+				const Vec3b *imgSrc = partMat.ptr<Vec3b>(u);
+				for (int v = 0; v < kernelSize; ++v) {
+					result[0] += imgSrc[v][0] * kernel.at(u * kernelSize + v);
+					result[1] += imgSrc[v][1] * kernel.at(u * kernelSize + v);
+					result[2] += imgSrc[v][2] * kernel.at(u * kernelSize + v);
+				}
+			}
+
+			destSrc[x][0] = (result[0] / sum);
+			destSrc[x][1] = (result[1] / sum);
+			destSrc[x][2] = (result[2] / sum);
+		}
+	}
 }
-
-void Pink(const Mat src, const Mat srcHSV) {
-	//マスク作成
-	Mat mask;
-	cv::inRange(srcHSV, Scalar(4, 0, 0), Scalar(167, 255, 255), mask);
-
-	mask = ~mask;
-	imshow("Mask", mask);
-
-	morphologyEx(mask, mask, MORPH_OPEN, Mat(), Point(-1, -1), 2);
-	morphologyEx(mask, mask, MORPH_CLOSE, Mat(), Point(-1, -1), 10);
-	imshow("AfterMask", mask);
-
-	//作成したマスクと論理積を取る
-	Mat result;
-	bitwise_and(src, src, result, mask);
-	imshow("Reuslt", result);
-}
-
-void Blue(const Mat src, const Mat srcHSV) {
-	//マスク作成
-	Mat mask;
-	cv::inRange(srcHSV, Scalar(110, 40, 0), Scalar(180, 147, 137), mask);
-
-	imshow("Mask", mask);
-
-	morphologyEx(mask, mask, MORPH_OPEN, Mat(), Point(-1, -1), 1);
-	morphologyEx(mask, mask, MORPH_CLOSE, Mat(), Point(-1, -1), 20);
-	imshow("AfterMask", mask);
-
-	//作成したマスクと論理積を取る
-	Mat result;
-	bitwise_and(src, src, result, mask);
-	imshow("Reuslt", result);
-}
-
-enum class Color {
-	Orange,
-	Yellow,
-	Green,
-	Pink,
-	Blue
-};
 
 int main() {
 
-	const string windowName = "Window";
-	namedWindow(windowName, WINDOW_AUTOSIZE);
-
 	Mat src = imread("./img/Kodak/kodim03.png");
-	imshow("Window", src);
-	Mat srcHSV;
-	cvtColor(src, srcHSV, CV_BGR2HSV);
-
-	int type;
-	cout << "0: Orange, 1: Yellow, 2: Green, 3: Pink, 4: Blue" << endl;
-	cin >> type;
-
-	switch (static_cast<Color>(type)) {
-		case Color::Orange:
-			Orange(src, srcHSV);
-			break;
-		case Color::Yellow:
-			Yellow(src, srcHSV);
-			break;
-		case Color::Green:
-			Green(src, srcHSV);
-			break;
-		case Color::Pink:
-			Pink(src, srcHSV);
-			break;
-		case Color::Blue:
-			Blue(src, srcHSV);
-			break;
-	}
+	Mat dest;
+	src.copyTo(dest);
+	imshow("SRC", src);
+	GaussianFilter_sugiura(src, dest, 5, 5 / 3.0f);
+	imshow("Gaussian", dest);
 
 	while (1) {
 		if (waitKey(1) == 'q') {
