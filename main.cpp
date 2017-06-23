@@ -16,53 +16,71 @@ void GaussianFilter(const Mat &src, Mat &dest, const int r, const float sigma) {
 	CV_Assert(src.size() == dest.size());
 
 	Mat srcExpandBoarder;
-	//端のときに範囲外にならないようにフィルタ半径分全方向に広げる
-	copyMakeBorder(src, srcExpandBoarder, r, r, r, r, cv::BORDER_REFLECT_101);
+	copyMakeBorder(src, srcExpandBoarder, r, r, r, r, BORDER_REFLECT101);
 
-	double data[2 * r + 1];
+	double *kernel = new double[2 * r + 1];
+	double sum = 0.0;
 	{
 		float sigma2 = sigma * sigma;
 
 		for (int x = -r; x <= r; ++x) {
-			data[x + r] = sqrt(exp(-(x * x + x * x) / (2.0 * sigma2)));
+			kernel[x + r] = exp(-(x * x) / (2.0 * sigma2));
+			sum += kernel[x + r];
 		}
 	}
 
-	vector<double> kernel;
-	{
-		float sigma2 = sigma * sigma;
+	sum = 1.0 / sum;
 
-		for (int y = -r; y <= r; ++y) {
-			for (int x = -r; x <= r; ++x) {
-				kernel.emplace_back(exp(-(x * x + y * y) / (2.0 * sigma2)));
-			}
-		}
+
+	for (int x = -r; x <= r; ++x) {
+		kernel[x + r] *= sum;
 	}
-	double sum = std::accumulate(kernel.begin(), kernel.end(), 0.0);
-
-	Mat matA(1, 2 * r + 1, CV_64FC1, data);
-	Mat matB(2 * r + 1, 1, CV_64FC1, data);
-
 
 	for (int y = 0; y < src.rows; ++y) {
-		Vec3d *destSrc = dest.ptr<Vec3d>(y);
+		Vec3b *destTmp = dest.ptr<Vec3b>(y);
+		const Vec3b *srcTmp = srcExpandBoarder.ptr<Vec3b>(y + r);
 		for (int x = 0; x < src.cols; ++x) {
-			Mat partMat = srcExpandBoarder(Rect(x, y, 2 * r + 1, 2 * r + 1));
-			vector<Mat> colors;
-			split(partMat, colors);
+			double resultB = 0.0;
+			double resultG = 0.0;
+			double resultR = 0.0;
 
-			vector<Mat> results;
-			results.emplace_back(matA * colors[0] * matB);
-			results.emplace_back(matA * colors[1] * matB);
-			results.emplace_back(matA * colors[2] * matB);
+			for (int i = -r; i <= r; ++i) {
+				resultB += srcTmp[r + x + i](0) * kernel[i + r];
+				resultG += srcTmp[r + x + i](1) * kernel[i + r];
+				resultR += srcTmp[r + x + i](2) * kernel[i + r];
+			}
 
-
-			Mat result;
-			merge(results, result);
-
-			destSrc[x] = result.ptr<Vec3d>(0)[0] / sum;
+			destTmp[x](0) = resultB;
+			destTmp[x](1) = resultG;
+			destTmp[x](2) = resultR;
 		}
 	}
+
+	Mat srcExpandBoarder2;
+	copyMakeBorder(dest, srcExpandBoarder2, r, r, r, r, BORDER_REFLECT101);
+
+	//ここから下のどこかがおかしい
+	for (int y = 0; y < src.rows; ++y) {
+		Vec3b *destTmp = dest.ptr<Vec3b>(y);
+		for (int x = 0; x < src.cols; ++x) {
+			double resultB = 0.0;
+			double resultG = 0.0;
+			double resultR = 0.0;
+
+			for (int i = -r; i <= r; ++i) {
+				const Vec3b *srcTmp = srcExpandBoarder2.ptr<Vec3b>(y + r + i);
+				resultB += srcTmp[r + x](0) * kernel[i + r];
+				resultG += srcTmp[r + x](1) * kernel[i + r];
+				resultR += srcTmp[r + x](2) * kernel[i + r];
+			}
+
+			destTmp[x](0) = resultB;
+			destTmp[x](1) = resultG;
+			destTmp[x](2) = resultR;
+		}
+	}
+
+	delete[] kernel;
 }
 
 
@@ -86,13 +104,13 @@ private:
 };
 
 void GaussianFilter_sugiura(const Mat &src, Mat &dest, int r, float sigma) {
-	parallel_for_(Range(0, dest.rows), ParallelGaussian(src, dest, r, r / 3.0f));
+	parallel_for_(Range(0, dest.rows), ParallelGaussian(src, dest, r, sigma));
 }
 
-void CheckTime(Mat &src, Mat &dest, int r) {
+void CheckTime(Mat &src, Mat &dest, int r, float sigma) {
 	auto start = chrono::system_clock::now();
 //	GaussianFilter(src, dest, r, r / 3.0f);
-	GaussianFilter_sugiura(src, dest, r, r / 3.0f);
+	GaussianFilter_sugiura(src, dest, r, sigma);
 	auto end = chrono::system_clock::now();
 	auto time = end - start;
 	auto msec = chrono::duration_cast<std::chrono::milliseconds>(time).count();
@@ -103,24 +121,20 @@ void CheckTime(Mat &src, Mat &dest, int r) {
 int main() {
 
 	Mat src = imread("./img/Kodak/kodim03.png");
-	Mat srcD;
-	src.convertTo(srcD, CV_64FC3, 1 / 255.0);
 	Mat dest;
-	srcD.copyTo(dest);
+	src.copyTo(dest);
 	imshow("SRC", src);
 
-
-	int r = 10;
+	int r = 40;
 	int kernelSize = r * 2 + 1;
 
-	CheckTime(srcD, dest, r);
+	CheckTime(src, dest, r, r / 3.0f);
+	imshow("Gaussian1", dest);
 
 	Mat dest2;
-	GaussianBlur(src, dest2, Size(kernelSize, kernelSize), r / 3.0);
+	GaussianBlur(src, dest2, Size(1, kernelSize), r / 3.0f);
 	imshow("Gaussian2", dest2);
 
-	dest.convertTo(dest, CV_8UC3, 255);
-	imshow("Gaussian", dest);
 	cout << "PSNR:" << PSNR(dest, dest2) << endl;
 
 	while (1) {
