@@ -11,15 +11,22 @@
 using namespace std;
 using namespace cv;
 
-void GaussianFilter(const Mat &src, Mat &dest, int r, float sigma) {
+void GaussianFilter(const Mat &src, Mat &dest, const int r, const float sigma) {
 
 	CV_Assert(src.size() == dest.size());
-	CV_Assert(src.type() == CV_8UC3);
-	CV_Assert(dest.type() == CV_8UC3);
 
 	Mat srcExpandBoarder;
 	//端のときに範囲外にならないようにフィルタ半径分全方向に広げる
 	copyMakeBorder(src, srcExpandBoarder, r, r, r, r, cv::BORDER_REFLECT_101);
+
+	double data[2 * r + 1];
+	{
+		float sigma2 = sigma * sigma;
+
+		for (int x = -r; x <= r; ++x) {
+			data[x + r] = sqrt(exp(-(x * x + x * x) / (2.0 * sigma2)));
+		}
+	}
 
 	vector<double> kernel;
 	{
@@ -31,28 +38,29 @@ void GaussianFilter(const Mat &src, Mat &dest, int r, float sigma) {
 			}
 		}
 	}
-
-
 	double sum = std::accumulate(kernel.begin(), kernel.end(), 0.0);
 
+	Mat matA(1, 2 * r + 1, CV_64FC1, data);
+	Mat matB(2 * r + 1, 1, CV_64FC1, data);
+
+
 	for (int y = 0; y < src.rows; ++y) {
-		Vec3b *destSrc = dest.ptr<Vec3b>(y);
+		Vec3d *destSrc = dest.ptr<Vec3d>(y);
 		for (int x = 0; x < src.cols; ++x) {
 			Mat partMat = srcExpandBoarder(Rect(x, y, 2 * r + 1, 2 * r + 1));
-			const int kernelSize = 2 * r + 1;
-			double result[3] = {0.0, 0.0, 0.0};
-			for (int u = 0; u < kernelSize; ++u) {
-				const Vec3b *imgSrc = partMat.ptr<Vec3b>(u);
-				for (int v = 0; v < kernelSize; ++v) {
-					result[0] += imgSrc[v][0] * kernel.at(u * kernelSize + v);
-					result[1] += imgSrc[v][1] * kernel.at(u * kernelSize + v);
-					result[2] += imgSrc[v][2] * kernel.at(u * kernelSize + v);
-				}
-			}
+			vector<Mat> colors;
+			split(partMat, colors);
 
-			destSrc[x][0] = (result[0] / sum);
-			destSrc[x][1] = (result[1] / sum);
-			destSrc[x][2] = (result[2] / sum);
+			vector<Mat> results;
+			results.emplace_back(matA * colors[0] * matB);
+			results.emplace_back(matA * colors[1] * matB);
+			results.emplace_back(matA * colors[2] * matB);
+
+
+			Mat result;
+			merge(results, result);
+
+			destSrc[x] = result.ptr<Vec3d>(0)[0] / sum;
 		}
 	}
 }
@@ -95,21 +103,25 @@ void CheckTime(Mat &src, Mat &dest, int r) {
 int main() {
 
 	Mat src = imread("./img/Kodak/kodim03.png");
+	Mat srcD;
+	src.convertTo(srcD, CV_64FC3, 1 / 255.0);
 	Mat dest;
-	src.copyTo(dest);
+	srcD.copyTo(dest);
 	imshow("SRC", src);
 
-	int r = 5;
+
+	int r = 10;
 	int kernelSize = r * 2 + 1;
 
-	CheckTime(src, dest, r);
-	imshow("Gaussian", dest);
+	CheckTime(srcD, dest, r);
 
 	Mat dest2;
 	GaussianBlur(src, dest2, Size(kernelSize, kernelSize), r / 3.0);
 	imshow("Gaussian2", dest2);
 
-	cout << PSNR(dest, dest2) << endl;
+	dest.convertTo(dest, CV_8UC3, 255);
+	imshow("Gaussian", dest);
+	cout << "PSNR:" << PSNR(dest, dest2) << endl;
 
 	while (1) {
 		if (waitKey(1) == 'q') {
