@@ -15,9 +15,6 @@ void GaussianFilter(const Mat &src, Mat &dest, const int r, const float sigma) {
 
 	CV_Assert(src.size() == dest.size());
 
-	Mat srcExpandBoarder;
-	copyMakeBorder(src, srcExpandBoarder, r, r, r, r, BORDER_REFLECT101);
-
 	double *kernel = new double[2 * r + 1];
 	double sum = 0.0;
 	{
@@ -36,9 +33,35 @@ void GaussianFilter(const Mat &src, Mat &dest, const int r, const float sigma) {
 		kernel[x + r] *= sum;
 	}
 
+	Mat srcExpandBoarder;
+	copyMakeBorder(src, srcExpandBoarder, r, r, r, r, BORDER_REFLECT101);
+
 	for (int y = 0; y < src.rows; ++y) {
 		Vec3b *destTmp = dest.ptr<Vec3b>(y);
-		const Vec3b *srcTmp = srcExpandBoarder.ptr<Vec3b>(y + r);
+		for (int x = 0; x < src.cols; ++x) {
+			double resultB = 0.0;
+			double resultG = 0.0;
+			double resultR = 0.0;
+
+			for (int i = -r; i <= r; ++i) {
+				const Vec3b *srcTmp = srcExpandBoarder.ptr<Vec3b>(y + r + i);
+				resultB += srcTmp[r + x](0) * kernel[i + r];
+				resultG += srcTmp[r + x](1) * kernel[i + r];
+				resultR += srcTmp[r + x](2) * kernel[i + r];
+			}
+
+			destTmp[x](0) = resultB;
+			destTmp[x](1) = resultG;
+			destTmp[x](2) = resultR;
+		}
+	}
+
+	Mat srcExpandBoarder2;
+	copyMakeBorder(dest, srcExpandBoarder2, r, r, r, r, BORDER_REFLECT101);
+
+	for (int y = 0; y < src.rows; ++y) {
+		Vec3b *destTmp = dest.ptr<Vec3b>(y);
+		const Vec3b *srcTmp = srcExpandBoarder2.ptr<Vec3b>(y + r);
 		for (int x = 0; x < src.cols; ++x) {
 			double resultB = 0.0;
 			double resultG = 0.0;
@@ -56,29 +79,6 @@ void GaussianFilter(const Mat &src, Mat &dest, const int r, const float sigma) {
 		}
 	}
 
-	Mat srcExpandBoarder2;
-	copyMakeBorder(dest, srcExpandBoarder2, r, r, r, r, BORDER_REFLECT101);
-
-	//ここから下のどこかがおかしい
-	for (int y = 0; y < src.rows; ++y) {
-		Vec3b *destTmp = dest.ptr<Vec3b>(y);
-		for (int x = 0; x < src.cols; ++x) {
-			double resultB = 0.0;
-			double resultG = 0.0;
-			double resultR = 0.0;
-
-			for (int i = -r; i <= r; ++i) {
-				const Vec3b *srcTmp = srcExpandBoarder2.ptr<Vec3b>(y + r + i);
-				resultB += srcTmp[r + x](0) * kernel[i + r];
-				resultG += srcTmp[r + x](1) * kernel[i + r];
-				resultR += srcTmp[r + x](2) * kernel[i + r];
-			}
-
-			destTmp[x](0) = resultB;
-			destTmp[x](1) = resultG;
-			destTmp[x](2) = resultR;
-		}
-	}
 
 	delete[] kernel;
 }
@@ -132,7 +132,7 @@ int main() {
 	imshow("Gaussian1", dest);
 
 	Mat dest2;
-	GaussianBlur(src, dest2, Size(1, kernelSize), r / 3.0f);
+	GaussianBlur(src, dest2, Size(kernelSize, kernelSize), r / 3.0f);
 	imshow("Gaussian2", dest2);
 
 	cout << "PSNR:" << PSNR(dest, dest2) << endl;
